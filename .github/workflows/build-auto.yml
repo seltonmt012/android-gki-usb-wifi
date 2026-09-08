@@ -365,6 +365,7 @@ jobs:
             LLVM=1 CC=clang LD=ld.lld \
             CONFIG_PLATFORM_I386_PC=n \
             CONFIG_PLATFORM_ANDROID_ARM64=y \
+            CONFIG_LOAD_PHY_PARA_FROM_FILE=n \
             KCFLAGS="-Wno-unknown-warning-option -Wno-error -DCONFIG_RTW_ANDROID_GKI"
           echo "--- built .ko ---"
           find . -name "*.ko" -exec ls -la {} \;
