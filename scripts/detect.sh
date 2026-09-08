@@ -186,6 +186,12 @@ usb_hint() {
     2357:0108) echo "rtl88xxau_oot|none(in-driver)|RTL8812AU (TP-Link Archer T4U; OUT-OF-TREE)";;
     2357:0101) echo "rtl88xxau_oot|none(in-driver)|RTL8812AU (TP-Link; OUT-OF-TREE)";;
     0e66:0022) echo "rtl88xxau_oot|none(in-driver)|RTL8812AU (Hawking; OUT-OF-TREE)";;
+    # --- Realtek OUT-OF-TREE (rtl8821cu_oot) : RTL8811CU/8821CU (morrownr driver) ---
+    0bda:c820) echo "rtl8821cu_oot|none(in-driver)|RTL8821CU (TP-Link Archer T2U Nano / T2UB Nano / T2U Plus; OUT-OF-TREE)";;
+    0bda:c811) echo "rtl8821cu_oot|none(in-driver)|RTL8811CU (OUT-OF-TREE)";;
+    0bda:c82c) echo "rtl8821cu_oot|none(in-driver)|RTL8821CU (OUT-OF-TREE)";;
+    2357:012d) echo "rtl8821cu_oot|none(in-driver)|RTL8821CU (TP-Link Archer T2U Plus; OUT-OF-TREE)";;
+    2357:0138) echo "rtl8821cu_oot|none(in-driver)|RTL8821CU (TP-Link Archer T2U Nano; OUT-OF-TREE)";;
     *) echo "unknown|unknown|unrecognized - look up the USB ID";;
   esac
 }
@@ -271,6 +277,11 @@ case "${DRIVER:-}" in
     say "      The workflow builds it from an external repo (default: aircrack-ng/rtl8812au)."
     say "      Success is less guaranteed than in-tree drivers; the driver must support"
     say "      your kernel version. If it fails to build, try a different driver branch." ;;
+  rtl8821cu_oot)
+    say "NOTE: this adapter needs an OUT-OF-TREE Realtek driver (RTL8811CU/8821CU)."
+    say "      The workflow builds it from morrownr/8821cu-20210916 against your kernel."
+    say "      Monitor mode is supported; injection on the CU chip is weaker than AU -"
+    say "      verify with 'aireplay-ng --test wlan1'. If the build fails, try oot_branch." ;;
   rtl8xxxu)
     say "NOTE: RTL8188/8192 via in-tree rtl8xxxu. Monitor-mode/injection support varies by chip." ;;
   rt2800usb)

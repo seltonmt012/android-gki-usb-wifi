@@ -27,7 +27,7 @@ on:
         required: true
         default: "full"
       driver:
-        description: "Driver: mt76x2u | mt76x0u | mt7601u | rt2800usb | ath9k_htc | rtl8xxxu | rtl88xxau_oot"
+        description: "Driver: mt76x2u | mt76x0u | mt7601u | rt2800usb | ath9k_htc | rtl8xxxu | rtl88xxau_oot | rtl8821cu_oot"
         required: true
         default: "mt76x2u"
       oot_repo:
@@ -38,6 +38,14 @@ on:
         description: "For rtl88xxau_oot only: branch/tag of that repo"
         required: false
         default: "v5.6.4.2"
+      oot_repo_cu:
+        description: "For rtl8821cu_oot only: git URL of the RTL8811CU/8821CU driver"
+        required: false
+        default: "https://github.com/morrownr/8821cu-20210916"
+      oot_branch_cu:
+        description: "For rtl8821cu_oot only: branch/tag of that repo"
+        required: false
+        default: "main"
 
 jobs:
   build:
@@ -186,7 +194,7 @@ jobs:
 
           # mac80211 is needed by every driver EXCEPT the Realtek out-of-tree one,
           # which ships its own stack. Add it unless that path is chosen.
-          if [ "$DRIVER" != "rtl88xxau_oot" ]; then
+          if [ "$DRIVER" != "rtl88xxau_oot" ] && [ "$DRIVER" != "rtl8821cu_oot" ]; then
             echo "CONFIG_MAC80211=m" >> arch/arm64/configs/gki_defconfig
           fi
 
@@ -228,6 +236,11 @@ jobs:
             rtl88xxau_oot)
               # out-of-tree (RTL8812AU/8814AU/8821AU) - built in a later step.
               # Only mac80211/cfg80211 base is needed here; driver brings the rest.
+              echo "CONFIG_MAC80211=m" >> arch/arm64/configs/gki_defconfig ;;
+            rtl8821cu_oot)
+              # out-of-tree (RTL8811CU/8821CU, morrownr) - built in a later step.
+              # Self-contained Realtek stack; only cfg80211 (already added) is needed.
+              # mac80211 not required, but harmless to build for the watcher.
               echo "CONFIG_MAC80211=m" >> arch/arm64/configs/gki_defconfig ;;
             *)
               echo "::error::Unknown driver $DRIVER"; exit 1 ;;
@@ -291,6 +304,34 @@ jobs:
                  make -j$(nproc) KSRC="$GITHUB_WORKSPACE/ks/out" ARCH=arm64 || true; }
           find . -name "*.ko" -exec ls -la {} \;
 
+      - name: Build out-of-tree Realtek CU driver (RTL8811CU/8821CU)
+        if: ${{ github.event.inputs.driver == 'rtl8821cu_oot' }}
+        env:
+          OOT_REPO: ${{ github.event.inputs.oot_repo_cu }}
+          OOT_BRANCH: ${{ github.event.inputs.oot_branch_cu }}
+        run: |
+          export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
+          git clone --depth 1 -b "$OOT_BRANCH" "$OOT_REPO" oot || \
+          git clone --depth 1 "$OOT_REPO" oot
+          cd oot
+          echo "Building $(basename "$OOT_REPO") @ $OOT_BRANCH against prepared kernel..."
+          # morrownr Makefiles default to CONFIG_PLATFORM_I386_PC=y (x86). Force it
+          # off and select the ARM64 platform, then override KSRC/ARCH/CROSS_COMPILE
+          # on the command line so they win over the Makefile's platform block.
+          make -j$(nproc) \
+            KSRC="$GITHUB_WORKSPACE/ks/out" \
+            ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang LD=ld.lld \
+            CONFIG_PLATFORM_I386_PC=n \
+            CONFIG_PLATFORM_ANDROID_ARM64=y \
+            || { echo "::warning::CU OOT build failed with LLVM; retrying with GCC cross toolchain"; \
+                 make -j$(nproc) KSRC="$GITHUB_WORKSPACE/ks/out" ARCH=arm64 \
+                   CROSS_COMPILE=aarch64-linux-gnu- \
+                   CONFIG_PLATFORM_I386_PC=n CONFIG_PLATFORM_ANDROID_ARM64=y || true; }
+          echo "--- built .ko ---"
+          find . -name "*.ko" -exec ls -la {} \;
+
       - name: Show module_layout CRC
         if: always()
         working-directory: ks
@@ -329,6 +370,7 @@ jobs:
             rt2800usb) DRVNAME=rt2800usb; LEAF=rt2800usb.ko; FW=""; USBID="148f:5370" ;;
             ath9k_htc) DRVNAME=ath9k_htc; LEAF=ath9k_htc.ko; FW="ath9k_htc/htc_9271-1.4.0.fw ath9k_htc/htc_7010-1.4.0.fw"; USBID="0cf3:9271" ;;
             rtl8xxxu) DRVNAME=rtl8xxxu; LEAF=rtl8xxxu.ko; FW=""; USBID="0bda:8178" ;;
+            rtl8821cu_oot) DRVNAME=8821cu; LEAF=8821cu.ko; FW=""; USBID="0bda:c820" ;;
             *) echo "packaging: unsupported driver $DRIVER for Magisk zip (in-tree only)"; exit 0 ;;
           esac
 
