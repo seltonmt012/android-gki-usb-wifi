@@ -318,6 +318,14 @@ jobs:
           # morrownr Makefiles default to CONFIG_PLATFORM_I386_PC=y (x86). Force it
           # off and select the ARM64 platform, then override KSRC/ARCH/CROSS_COMPILE
           # on the command line so they win over the Makefile's platform block.
+          #
+          # The Realtek OOT Makefiles also carry GCC-only warning suppressions
+          # (-Wno-enum-int-mismatch, -Wno-stringop-overread) that clang rejects
+          # under the kernel's -Werror=unknown-warning-option. Strip the known
+          # offenders, and via KCFLAGS tell clang to ignore any remaining unknown
+          # -W options and not treat warnings as errors.
+          grep -rlZ -e '-Wno-enum-int-mismatch' -e '-Wno-stringop-overread' . 2>/dev/null \
+            | xargs -0 -r sed -i 's/-Wno-enum-int-mismatch//g; s/-Wno-stringop-overread//g'
           make -j$(nproc) \
             KSRC="$GITHUB_WORKSPACE/ks/out" \
             ARCH=arm64 \
@@ -325,10 +333,7 @@ jobs:
             LLVM=1 CC=clang LD=ld.lld \
             CONFIG_PLATFORM_I386_PC=n \
             CONFIG_PLATFORM_ANDROID_ARM64=y \
-            || { echo "::warning::CU OOT build failed with LLVM; retrying with GCC cross toolchain"; \
-                 make -j$(nproc) KSRC="$GITHUB_WORKSPACE/ks/out" ARCH=arm64 \
-                   CROSS_COMPILE=aarch64-linux-gnu- \
-                   CONFIG_PLATFORM_I386_PC=n CONFIG_PLATFORM_ANDROID_ARM64=y || true; }
+            KCFLAGS="-Wno-unknown-warning-option -Wno-error"
           echo "--- built .ko ---"
           find . -name "*.ko" -exec ls -la {} \;
 
