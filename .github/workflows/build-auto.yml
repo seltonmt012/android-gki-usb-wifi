@@ -93,7 +93,7 @@ jobs:
           path: |
             ks
             clang
-          key: kbuild-${{ github.event.inputs.kcommit }}-btf${{ github.event.inputs.btf }}-lto${{ github.event.inputs.lto }}-${{ github.event.inputs.clang_ver }}-v1
+          key: kbuild-${{ github.event.inputs.kcommit }}-btf${{ github.event.inputs.btf }}-lto${{ github.event.inputs.lto }}-${{ github.event.inputs.clang_ver }}-testmode-v2
 
       - name: Fetch kernel source (exact commit)
         if: steps.kcache.outputs.cache-hit != 'true'
@@ -203,6 +203,11 @@ jobs:
             echo "CONFIG_WLAN=y"
             echo "CONFIG_CFG80211=m"
             echo "CONFIG_USB=y"
+            # NL80211_TESTMODE gates testmode_cmd/testmode_dump in struct
+            # cfg80211_ops. Android vendor cfg80211 builds enable it, so it must
+            # match or every ops member after it is offset by 2 pointers -> the
+            # driver's wiphy fails cfg80211's consistency WARN_ONs at register.
+            echo "CONFIG_NL80211_TESTMODE=y"
           } >> arch/arm64/configs/gki_defconfig
 
           # mac80211 is needed by every driver EXCEPT the Realtek out-of-tree one,
