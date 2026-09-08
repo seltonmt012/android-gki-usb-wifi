@@ -326,6 +326,17 @@ jobs:
           # -W options and not treat warnings as errors.
           grep -rlZ -e '-Wno-enum-int-mismatch' -e '-Wno-stringop-overread' . 2>/dev/null \
             | xargs -0 -r sed -i 's/-Wno-enum-int-mismatch//g; s/-Wno-stringop-overread//g'
+          # Android's android14-6.1 kernel backports the 6.3.0 cfg80211 MLO
+          # signatures (cfg80211_ch_switch_notify / _started_notify gain link_id
+          # args) into 6.1. The driver gates those on KERNEL_VERSION >= 6.3.0, so
+          # on a stock 6.1 it emits the old (fewer-arg) call and fails to build
+          # ("too few arguments"). Lower the guard to 6.1.0 so the backported
+          # signature is used. Scoped to this build only.
+          if [ -f os_dep/linux/ioctl_cfg80211.c ]; then
+            sed -i 's/LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))/LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0) \&\& (LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))/g' \
+              os_dep/linux/ioctl_cfg80211.c
+            echo "patched cfg80211 ch_switch guards:"; grep -n "KERNEL_VERSION(6, 1, 0) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))" os_dep/linux/ioctl_cfg80211.c || true
+          fi
           make -j$(nproc) \
             KSRC="$GITHUB_WORKSPACE/ks/out" \
             ARCH=arm64 \
