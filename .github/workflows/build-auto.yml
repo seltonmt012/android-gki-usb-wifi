@@ -86,7 +86,17 @@ jobs:
             exit 1
           fi
 
+      - name: Cache built kernel tree + clang
+        id: kcache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ks
+            clang
+          key: kbuild-${{ github.event.inputs.kcommit }}-btf${{ github.event.inputs.btf }}-lto${{ github.event.inputs.lto }}-${{ github.event.inputs.clang_ver }}-v1
+
       - name: Fetch kernel source (exact commit)
+        if: steps.kcache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ks
           URL="https://android.googlesource.com/kernel/common/+archive/${{ github.event.inputs.kcommit }}.tar.gz"
@@ -113,6 +123,7 @@ jobs:
           ls ks/Makefile && head -3 ks/Makefile
 
       - name: Patch drivers for GKI KMI limits
+        if: steps.kcache.outputs.cache-hit != 'true'
         working-directory: ks
         env:
           DRIVER: ${{ github.event.inputs.driver }}
@@ -140,6 +151,7 @@ jobs:
           fi
 
       - name: Fetch Android Clang
+        if: steps.kcache.outputs.cache-hit != 'true'
         run: |
           mkdir -p clang
           CV="${{ github.event.inputs.clang_ver }}"
@@ -177,6 +189,7 @@ jobs:
           sh -n packaging/action.sh && echo "action.sh OK"
 
       - name: Configure
+        if: steps.kcache.outputs.cache-hit != 'true'
         working-directory: ks
         env:
           DRIVER: ${{ github.event.inputs.driver }}
@@ -262,6 +275,7 @@ jobs:
           grep -E "CONFIG_(CFG80211=|MAC80211=|MT76|RT2X00|RT2800|ATH9K|RTL8XXXU|DEBUG_INFO_BTF|LTO_CLANG)" out/.config || true
 
       - name: Prepare kernel for external modules
+        if: steps.kcache.outputs.cache-hit != 'true'
         working-directory: ks
         run: |
           export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
@@ -269,6 +283,7 @@ jobs:
           make LLVM=1 ARCH=arm64 O=out modules_prepare
 
       - name: Add swap
+        if: steps.kcache.outputs.cache-hit != 'true'
         run: |
           sudo swapoff -a || true
           sudo fallocate -l 24G /mnt/swapfile
@@ -278,6 +293,7 @@ jobs:
           free -h
 
       - name: Build in-tree modules
+        if: steps.kcache.outputs.cache-hit != 'true'
         working-directory: ks
         run: |
           export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
@@ -344,7 +360,7 @@ jobs:
             LLVM=1 CC=clang LD=ld.lld \
             CONFIG_PLATFORM_I386_PC=n \
             CONFIG_PLATFORM_ANDROID_ARM64=y \
-            KCFLAGS="-Wno-unknown-warning-option -Wno-error"
+            KCFLAGS="-Wno-unknown-warning-option -Wno-error -DCONFIG_RTW_ANDROID_GKI"
           echo "--- built .ko ---"
           find . -name "*.ko" -exec ls -la {} \;
 
